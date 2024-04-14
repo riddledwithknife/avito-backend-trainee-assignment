@@ -5,5 +5,11 @@
     "user": "postgres",
     "password": "postgres",
     "dbName": "banner-service-database"
+  },
+  "redis": {
+    "host": "redis",
+    "port": "6379",
+    "password": "",
+    "db": 0
   }
 }

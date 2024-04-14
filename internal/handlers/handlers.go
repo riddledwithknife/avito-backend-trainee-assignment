@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
 	"avito-backend-trainee-assignment/internal/models"
@@ -17,7 +20,7 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-func GetUserBannerHandler(db *gorm.DB) http.HandlerFunc {
+func GetUserBannerHandler(db *gorm.DB, redisClient *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.Header.Get("token")
 		var isAdmin bool
@@ -54,7 +57,32 @@ func GetUserBannerHandler(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err = strconv.ParseBool(r.URL.Query().Get("use_last_revision")) //Not forget
+		useLastRevisionStr := r.URL.Query().Get("use_last_revision")
+
+		var useLastRevision bool
+		if useLastRevisionStr != "" {
+			useLastRevision, err = strconv.ParseBool(useLastRevisionStr)
+			if err != nil {
+				errResponse := ErrorResponse{Error: "Invalid use last revision parameter"}
+				jsonErrResponse, _ := json.Marshal(errResponse)
+
+				w.WriteHeader(http.StatusBadRequest)
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(jsonErrResponse)
+			}
+		}
+
+		ctx := context.Background()
+
+		if useLastRevision {
+			bannerData, err := redisClient.Get(ctx, fmt.Sprintf("banner:%d:%d", featureID, tagID)).Bytes()
+			if err == nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(bannerData)
+				return
+			}
+		}
 
 		var banner models.Banner
 		if isAdmin {
@@ -229,7 +257,10 @@ func CreateBannerHandler(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
-		if err = db.Create(&newBanner).Error; err != nil { //Не создает false active?
+		newBanner.CreatedAt = time.Now()
+		newBanner.UpdatedAt = time.Now()
+
+		if err = db.Create(&newBanner).Error; err != nil {
 			errResponse := ErrorResponse{Error: "Error creating banner"}
 			jsonErrResponse, _ := json.Marshal(errResponse)
 

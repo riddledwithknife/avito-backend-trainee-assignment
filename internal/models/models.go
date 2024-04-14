@@ -14,6 +14,12 @@ type Config struct {
 		Password string `json:"password"`
 		DBName   string `json:"dbName"`
 	} `json:"database"`
+	Redis struct {
+		Host     string `json:"host"`
+		Port     string `json:"port"`
+		Password string `json:"password"`
+		DB       int    `json:"db"`
+	} `json:"redis"`
 }
 
 type Banner struct {

@@ -5,11 +5,13 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
 	"avito-backend-trainee-assignment/internal/config"
 	"avito-backend-trainee-assignment/internal/handlers"
+	"avito-backend-trainee-assignment/internal/last_revision"
 	"avito-backend-trainee-assignment/internal/models"
 )
 
@@ -30,9 +32,17 @@ func main() {
 	}
 	log.Println("Database migrated")
 
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     configFile.Redis.Host + ":" + configFile.Redis.Port,
+		Password: configFile.Redis.Password,
+		DB:       configFile.Redis.DB,
+	})
+
+	go last_revision.PeriodicDataUpdate(db, redisClient)
+
 	router := mux.NewRouter()
 
-	router.HandleFunc("/user_banner", handlers.GetUserBannerHandler(db)).Methods("GET")
+	router.HandleFunc("/user_banner", handlers.GetUserBannerHandler(db, redisClient)).Methods("GET")
 	router.HandleFunc("/banner", handlers.GetBannersHandler(db)).Methods("GET")
 	router.HandleFunc("/banner", handlers.CreateBannerHandler(db)).Methods("POST")
 	router.HandleFunc("/banner/{id}", handlers.UpdateBannerHandler(db)).Methods("PATCH")
